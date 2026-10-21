@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#183f34">
+  <title>GardenMDM — Контрагенты и проекты</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23183f34'/%3E%3Cpath d='M18 43V21h28v22H32V32h14' fill='none' stroke='%23c3dd89' stroke-width='5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="GardenMDM — главная"><span class="brand-mark">G<span>•</span></span><span>Garden<span class="brand-light">MDM</span></span></a>
+    <div class="workspace-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+    <nav aria-label="Разделы"><button class="nav-item active" data-tab="contractors"><span aria-hidden="true">◫</span>Контрагенты<span class="nav-count" id="nav-contractors">—</span></button><button class="nav-item" data-tab="projects"><span aria-hidden="true">▧</span>Проекты<span class="nav-count" id="nav-projects">—</span></button></nav>
+    <div class="sidebar-note"><span class="small-dot"></span> Единый источник данных<p>Контрагенты, банковские счета<br>и строительные объекты</p></div>
+    <div class="sidebar-bottom"><span class="avatar">G</span><div>Локальное пространство<small>Однопользовательская версия</small></div></div>
+  </aside>
+  <main>
+    <header class="topbar"><span>Справочники <span class="breadcrumb-separator">/</span> <strong id="breadcrumb">Контрагенты</strong></span><span class="environment"><span class="small-dot"></span> GardenMDM</span></header>
+    <div class="content">
+      <section class="page-heading"><div><p class="eyebrow">УПРАВЛЕНИЕ МАСТЕР-ДАННЫМИ</p><h1 id="page-title">Контрагенты</h1><p id="page-description">Реквизиты организаций, банковские счета и статусы проверки.</p></div><button class="button primary" id="create-button"><span aria-hidden="true">＋</span> Добавить контрагента</button></section>
+      <section class="stats" aria-label="Сводка"><div class="stat"><span>Всего контрагентов</span><strong id="stat-contractors">—</strong><small>Единый справочник</small></div><div class="stat"><span>Ожидают проверки</span><strong id="stat-pending">—</strong><small><span class="small-dot amber"></span> Требуют внимания</small></div><div class="stat"><span>Банковские счета</span><strong id="stat-accounts">—</strong><small>Реквизиты контрагентов</small></div><div class="stat"><span>Строительные проекты</span><strong id="stat-projects">—</strong><small>Объекты в справочнике</small></div></section>
+      <section class="registry" aria-label="Справочник">
+        <div class="registry-heading"><h2 id="registry-title">Реестр контрагентов</h2><span class="subtle" id="result-count" aria-live="polite"></span></div>
+        <div class="filters"><label class="search-field"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Наименование или ИНН" aria-label="Поиск"></label><label id="status-filter-label"><span class="sr-only">Статус</span><select id="status-filter"><option value="">Все статусы</option><option value="PENDING_REVIEW" selected>На проверке</option><option value="ACTIVE">Активен</option><option value="REJECTED">Отклонён</option><option value="MERGED">Объединён</option><option value="ARCHIVED">Архив</option></select></label><label id="city-filter-label" hidden><span class="sr-only">Город</span><input id="city-filter" placeholder="Город — точное название" aria-label="Город"></label><button class="button ghost" id="reset-filters">Сбросить фильтры</button><button class="icon-button" id="refresh-button" title="Обновить" aria-label="Обновить">↻</button></div>
+        <div id="project-filters" class="project-filters" hidden></div>
+        <div id="list-message" class="list-message" hidden aria-live="polite"></div>
+        <div class="table-scroll"><table id="registry-table"><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
+        <div class="table-footer"><span id="page-range" class="subtle"></span><div class="pagination"><button class="button secondary" id="previous-page" aria-label="Предыдущая страница">←</button><span id="page-label"></span><button class="button secondary" id="next-page" aria-label="Следующая страница">→</button></div></div>
+      </section>
+      <div class="selection-actions" id="selection-actions"><span id="selection-label">Выберите строку для работы с записью</span><div id="action-buttons"></div></div>
+      <p class="footnote">GardenMDM <span>•</span> Мастер-данные для строительных проектов</p>
+    </div>
+  </main>
+  <dialog id="editor"><div class="dialog-heading"><div><p class="eyebrow" id="dialog-eyebrow">КАРТОЧКА КОНТРАГЕНТА</p><h2 id="dialog-title"></h2></div><button class="icon-button" id="close-dialog" aria-label="Закрыть">×</button></div><div id="dialog-body"></div></dialog>
+  <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+</body>
+</html>

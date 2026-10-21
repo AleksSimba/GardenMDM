@@ -1,0 +1,81 @@
+name: gardenmdm
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mdm_db}
+      POSTGRES_USER: ${POSTGRES_USER:-mdm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-demo-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-mdm_db}
+      PGUSER: ${POSTGRES_USER:-mdm}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-local-demo-change-me}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  frontend:
+    build: ./frontend
+    ports:
+      - '${BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-80}:80'
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1/api/health/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  test-db:
+    image: postgres:15-alpine
+    profiles: [test]
+    environment:
+      POSTGRES_DB: mdm_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U test -d mdm_test']
+      interval: 2s
+      retries: 30
+  tests:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: test
+    profiles: [test]
+    environment:
+      PGHOST: test-db
+      PGDATABASE: mdm_test
+      PGUSER: test
+      PGPASSWORD: test-only
+      NODE_ENV: test
+      SEED_DEMO_DATA: 'false'
+    depends_on:
+      test-db:
+        condition: service_healthy
+volumes:
+  postgres_data:

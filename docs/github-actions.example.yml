@@ -1,0 +1,17 @@
+# Optional: place at .github/workflows/ci.yml using credentials with workflow permission.
+name: GardenMDM checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frontend and run PostgreSQL integration tests
+        run: sh scripts/test.sh
+      - name: Stop disposable services
+        if: always()
+        run: docker compose --profile test down --volumes

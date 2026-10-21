@@ -1,0 +1,7 @@
+{
+  "name": "gardenmdm-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "build": "tailwindcss -i ./styles.css -o ./dist/styles.css --minify && cp index.html app.js ./dist/", "check": "node --check app.js && node check-html.mjs" },
+  "devDependencies": { "tailwindcss": "3.4.17", "parse5": "7.3.0" }
+}

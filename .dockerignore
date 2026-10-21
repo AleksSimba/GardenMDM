@@ -1,0 +1,8 @@
+.git
+.env
+.aider*
+**/node_modules
+**/dist
+**/coverage
+backups
+work

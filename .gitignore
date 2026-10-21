@@ -4,3 +4,9 @@ build/
 .env
 *.log
 .DS_Store
+.aider*
+/backups/
+/.gardenmdm-*.tar.gz
+/.gardenmdm-prepare.py
+/.env.*
+!/.env.example
