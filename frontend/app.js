@@ -165,6 +165,7 @@ function contractorEditor(data){
   const grid=element('div','form-grid');const full=field('full_name','Наименование *',data?.full_name,{required:true,maxLength:255,full:true});
   const inn=field('inn','ИНН *',data?.inn,{required:true,readOnly:editing,maxLength:12});const kpp=field('kpp','КПП',data?.kpp,{maxLength:9});
   const address=field('legal_address','Юридический адрес',data?.legal_address,{tag:'textarea',full:true,maxLength:5000});grid.append(full.node,inn.node,kpp.node,address.node);form.append(grid);body.append(form);
+  const enrichment=!editing?innEnrichment(form,{full,inn,kpp,address}):null;
   let accountValues;
   if(!editing){
     const section=element('section','form-section');section.dataset.field='bank_accounts';const heading=element('div','section-heading');heading.append(element('h3','','Банковские счета *'));section.append(heading,element('span','field-error'));
@@ -184,9 +185,11 @@ function contractorEditor(data){
   form.addEventListener('submit',e=>{e.preventDefault();saving(form,async()=>{
     const value={full_name:full.input.value,kpp:kpp.input.value||null,legal_address:address.input.value||null};
     if(!editing){value.inn=inn.input.value;value.bank_accounts=accountValues();}
+    if(enrichment?.lookupId())value.lookup_id=enrichment.lookupId();
     await send(editing?`/contractors/${data.id}`:'/contractors',editing?'PATCH':'POST',value);$('#editor').close();toast(editing?'Реквизиты сохранены':'Контрагент создан и отправлен на проверку');await load();summary();
   });});
   if(editing){
+    if(data.registry_snapshot)body.append(registryDetails(data.registry_snapshot,data));
     const section=element('section','form-section'),heading=element('div','section-heading'),title=element('div');title.append(element('h3','','Банковские счета'),element('p','','Изменения счетов сохраняются отдельно.'));heading.append(title,button('＋ Добавить счёт','secondary small',()=>accountInline(section,data)));section.append(heading);
     for(const account of data.bank_accounts){
       const card=element('div','account-card'),info=element('div','account-summary'),details=element('div');details.append(element('strong','',account.bank_name),element('p','',`${account.account_number} · ${account.currency}`),element('p','',`БИК ${account.bik}${account.correspondent_account?` · К/с ${account.correspondent_account}`:''}`));
@@ -197,6 +200,54 @@ function contractorEditor(data){
     }
     body.append(section);const metadata=element('p','metadata',`ID: ${data.id} · Создано: ${date(data.created_at)} · Обновлено: ${date(data.updated_at)}`);body.append(metadata);
   }
+}
+function registryDetails(snapshot,current){
+  const section=element('section','registry-details');const heading=element('div','section-heading');heading.append(element('h3','','Сведения из реестра'));section.append(heading);
+  const registryStatus={ACTIVE:'Действующая',LIQUIDATING:'В процессе ликвидации',LIQUIDATED:'Ликвидирована',BANKRUPT:'Банкротство',REORGANIZING:'Реорганизация'};
+  const list=element('dl','registry-facts');
+  const sourceNames={dadata:'DaData',kontur_focus:'Контур.Фокус',seldon_basis:'Seldon.Basis'};
+  const items=[['Источник',`${sourceNames[snapshot.provider]||'Сервис реквизитов'} · ЕГРЮЛ / ЕГРИП`],['Получено',snapshot.fetched_at?new Date(snapshot.fetched_at).toLocaleString('ru-RU'):'—'],['Актуальность реестра',date(snapshot.actuality_date)],['Тип',snapshot.company_type==='INDIVIDUAL'?'Индивидуальный предприниматель':'Юридическое лицо'],['Полное наименование',snapshot.full_legal_name],['Краткое наименование',snapshot.short_name],['ИНН',snapshot.inn],['ОГРН / ОГРНИП',snapshot.ogrn],['ОКПО',snapshot.okpo],['Основной ОКВЭД',snapshot.okved],['Статус в реестре',registryStatus[snapshot.registry_status]||snapshot.registry_status||'Не получен'],['Дата регистрации',date(snapshot.registration_date)],['Руководитель',snapshot.management?.name],['Должность',snapshot.management?.post]];
+  for(const [label,value]of items){const entry=element('div');entry.append(element('dt','',label),element('dd','',value||'Не получено'));list.append(entry);}section.append(list);
+  const suggested=snapshot.suggested_fields;
+  if(current&&suggested&&['full_name','kpp','legal_address'].some(k=>(current[k]??null)!==(suggested[k]??null)))section.append(element('p','lookup-note','Реквизиты карточки отличаются от исходного результата поиска: часть значений введена или изменена вручную.'));
+  return section;
+}
+function innEnrichment(form,fields){
+  const section=element('section','inn-enrichment'),heading=element('div','section-heading'),title=element('div');
+  title.append(element('h3','','Заполнить по ИНН'),element('p','','Введите ИНН в поле ниже и получите реквизиты из реестра.'));
+  const search=button('Найти по ИНН','secondary');search.disabled=true;heading.append(title,search);const note=element('p','lookup-note','Проверяем доступность поиска…'),result=element('div');section.append(heading,note,result);form.prepend(section);
+  let selected=null,request=0,controller;
+  const inputSnapshot=()=>Object.fromEntries(['full_name','kpp','legal_address'].map(k=>[k,fields[{full_name:'full',kpp:'kpp',legal_address:'address'}[k]].input]));
+  fields.inn.input.addEventListener('input',()=>{selected=null;request++;controller?.abort();result.replaceChildren();search.disabled=section.dataset.enabled!=='true';search.textContent='Найти по ИНН';});
+  api('/integrations/inn/status').then(({data})=>{
+    if(!section.isConnected)return;section.dataset.enabled=String(data.enabled);search.disabled=!data.enabled;
+    note.textContent=data.enabled?`Источник — ${data.display_name||'сервис реквизитов'}. Сначала вы увидите найденные сведения, затем сможете заполнить форму.`:'Поиск по ИНН пока не подключён. Все реквизиты можно заполнить вручную.';
+  }).catch(()=>{note.textContent='Не удалось проверить доступность поиска. Можно продолжить ручной ввод.';});
+  search.addEventListener('click',async()=>{
+    const inn=fields.inn.input.value.trim();
+    if(!/^(\d{10}|\d{12})$/.test(inn)){fields.inn.error.textContent='Введите ИНН из 10 или 12 цифр';fields.inn.input.focus();return;}
+    const version=++request;controller?.abort();controller=new AbortController();selected=null;search.disabled=true;search.textContent='Ищем…';result.replaceChildren();fields.inn.error.textContent='';
+    try{
+      const {data}=await api('/contractors/lookup-by-inn',{method:'POST',body:JSON.stringify({inn}),signal:controller.signal});
+      if(version!==request||!section.isConnected||fields.inn.input.value.trim()!==inn)return;
+      const preview=element('div','lookup-preview');preview.append(registryDetails({...data.registry,provider:data.provider,fetched_at:data.fetched_at}));
+      const proposed=element('dl','registry-facts');for(const [key,label]of [['full_name','Будет заполнено: наименование'],['kpp','КПП'],['legal_address','Адрес']]){const row=element('div');row.append(element('dt','',label),element('dd','',data.fields[key]||'Не получено'));proposed.append(row);}preview.append(proposed);
+      for(const warning of data.warnings)preview.append(element('p','lookup-warning',warning));
+      if(data.cached)preview.append(element('p','lookup-note','Результат получен из сохранённого ответа за последние 24 часа.'));
+      const confirm=element('label','lookup-confirm'),checkbox=element('input');checkbox.type='checkbox';confirm.append(checkbox,document.createTextNode('Заменить уже введённые наименование, КПП и адрес'));
+      const hasChanges=()=>Object.entries(inputSnapshot()).some(([key,input])=>input.value.trim()&&(data.fields[key]??'')!==input.value.trim());
+      confirm.hidden=!hasChanges();preview.append(confirm);
+      const apply=button('Заполнить реквизиты','primary',()=>{
+        if(fields.inn.input.value.trim()!==data.fields.inn)return;
+        if(hasChanges()&&!checkbox.checked){confirm.hidden=false;checkbox.focus();toast('Подтвердите замену уже введённых реквизитов',true);return;}
+        fields.inn.input.value=data.fields.inn;
+        for(const [key,input]of Object.entries(inputSnapshot()))if(data.fields[key]!==null||key==='kpp')input.value=data.fields[key]??'';
+        selected=data;preview.replaceChildren(element('p','lookup-success','Реквизиты заполнены. Проверьте их, добавьте банковский счёт и сохраните контрагента.'),button('Продолжить без сведений реестра','ghost small',()=>{selected=null;preview.replaceChildren(element('p','lookup-note','При сохранении источник реестра не будет привязан. Введённые реквизиты оставлены для ручной проверки.'));}));
+      });preview.append(apply);result.append(preview);
+    }catch(e){if(e.name!=='AbortError'&&version===request){result.replaceChildren(element('p','form-alert',e.message));if(e.fields?.inn)fields.inn.error.textContent=e.fields.inn;}}
+    finally{if(version===request){search.disabled=false;search.textContent='Найти по ИНН';}}
+  });
+  return {lookupId:()=>selected&&selected.fields.inn===fields.inn.input.value.trim()?selected.lookup_id:null};
 }
 async function accountOperation(container,action){const controls=Array.from(container.querySelectorAll('button'));controls.forEach(n=>n.disabled=true);try{await action();summary();}catch(e){toast(e.message,true);}finally{controls.forEach(n=>n.disabled=false);}}
 async function reloadContractor(id){const {data}=await api(`/contractors/${id}`);if($('#editor').open)contractorEditor(data);}

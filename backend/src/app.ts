@@ -3,6 +3,8 @@ import helmet from 'helmet';
 import { ZodError, z } from 'zod';
 import type { PoolClient } from 'pg';
 import { pool, transaction } from './db.js';
+import { lookupByInn, lookupConfiguration, snapshotForCreation } from './party-lookup.js';
+import { validInn } from './validation.js';
 import { ApiError, invalid, uuid, statuses, listing, contractorCreate, contractorPatch, accountCreate, accountPatch, projectSchema, projectPatch } from './validation.js';
 
 export const app = express();
@@ -67,13 +69,21 @@ app.get('/api/contractors',async (req,res)=>{
   if(q.search) { p.push(`%${q.search}%`); where.push(`(t.full_name ILIKE $${p.length} OR t.inn ILIKE $${p.length})`); }
   res.json(await listResult('contractors',where,p,q.sort,q.order,q.page,q.limit));
 });
+app.get('/api/integrations/inn/status',(_req,res)=>{
+  res.set('Cache-Control','no-store').json({data:lookupConfiguration()});
+});
+app.post('/api/contractors/lookup-by-inn',async(req,res)=>{
+  const v=z.object({inn:z.string().refine(validInn,'Введите корректный ИНН из 10 или 12 цифр')}).strict().parse(req.body);
+  res.set('Cache-Control','no-store').json({data:await lookupByInn(v.inn)});
+});
 app.get('/api/contractors/:id',async(req,res)=>{
   const id=idOf(req.params.id); res.json({data:await transaction(c=>contractorDetail(c,id))});
 });
 app.post('/api/contractors',async(req,res)=>{
   const v=contractorCreate.parse(req.body);
   const data=await transaction(async c=>{
-    const r=await c.query('INSERT INTO contractors(full_name,inn,kpp,legal_address) VALUES($1,$2,$3,$4) RETURNING id',[v.full_name,v.inn,v.kpp??null,v.legal_address??null]);
+    const snapshot=v.lookup_id?await snapshotForCreation(c,v.lookup_id,v.inn):null;
+    const r=await c.query('INSERT INTO contractors(full_name,inn,kpp,legal_address,registry_snapshot) VALUES($1,$2,$3,$4,$5) RETURNING id',[v.full_name,v.inn,v.kpp??null,v.legal_address??null,snapshot?JSON.stringify(snapshot):null]);
     const id=r.rows[0].id; const chosen=Math.max(0,v.bank_accounts.findIndex(a=>a.is_primary));
     for(let i=0;i<v.bank_accounts.length;i++) await insertAccount(c,id,v.bank_accounts[i],i===chosen);
     return contractorDetail(c,id);

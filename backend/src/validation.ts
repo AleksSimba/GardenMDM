@@ -42,6 +42,7 @@ export const contractorCreate = z.object({
   full_name: name,
   inn: z.string().refine(validInn, 'Некорректный ИНН: требуется 10 или 12 цифр и верные контрольные разряды'),
   kpp: kpp.optional(), legal_address: optionalText.optional(),
+  lookup_id: uuid.optional(),
   bank_accounts: z.array(accountCreate).min(1, 'Добавьте хотя бы один банковский счёт').max(100)
 }).strict().superRefine((v, ctx) => {
   if (v.inn.length===10 && !v.kpp) ctx.addIssue({ code: 'custom', path:['kpp'], message:'Для организации КПП обязателен' });

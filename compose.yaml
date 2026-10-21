@@ -25,6 +25,8 @@ services:
       PGUSER: ${POSTGRES_USER:-mdm}
       PGPASSWORD: ${POSTGRES_PASSWORD:-local-demo-change-me}
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      DADATA_API_KEY: ${DADATA_API_KEY:-}
+      INN_LOOKUP_PROVIDER: ${INN_LOOKUP_PROVIDER:-none}
       NODE_ENV: production
     depends_on:
       postgres:
